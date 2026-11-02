@@ -161,7 +161,260 @@ function animate() {
 
   renderer.render(scene, camera);
 }
+// REALISTIC FIRST PERSON CAR GAME
 
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x87ceeb);
+scene.fog = new THREE.Fog(0x87ceeb, 50, 250);
+
+const camera = new THREE.PerspectiveCamera(
+  75, window.innerWidth / window.innerHeight, 0.1, 500
+);
+
+camera.position.set(0, 1.65, 0);
+
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+document.body.appendChild(renderer.domElement);
+
+// LIGHTING
+
+scene.add(new THREE.HemisphereLight(0xffffff, 0x667755, 2));
+
+const sun = new THREE.DirectionalLight(0xffffff, 2.5);
+sun.position.set(-30, 50, 20);
+sun.castShadow = true;
+scene.add(sun);
+
+// MATERIALS
+
+const roadMat = new THREE.MeshStandardMaterial({
+  color: 0x292929,
+  roughness: 0.95
+});
+
+const grassMat = new THREE.MeshStandardMaterial({
+  color: 0x397b35
+});
+
+const whiteMat = new THREE.MeshStandardMaterial({
+  color: 0xffffff
+});
+
+// GROUND
+
+const ground = new THREE.Mesh(
+  new THREE.PlaneGeometry(500, 500),
+  grassMat
+);
+
+ground.rotation.x = -Math.PI / 2;
+ground.position.set(0, -0.1, -200);
+scene.add(ground);
+
+// ROAD
+
+const road = new THREE.Mesh(
+  new THREE.PlaneGeometry(14, 500),
+  roadMat
+);
+
+road.rotation.x = -Math.PI / 2;
+road.position.set(0, 0, -200);
+scene.add(road);
+
+// ROAD LINES
+
+const lines = [];
+
+for (let i = 0; i < 40; i++) {
+  const line = new THREE.Mesh(
+    new THREE.BoxGeometry(0.18, 0.025, 5),
+    whiteMat
+  );
+
+  line.position.set(0, 0.025, -i * 12);
+  scene.add(line);
+  lines.push(line);
+}
+
+// TREES
+
+const trees = [];
+
+function makeTree(x, z) {
+  const group = new THREE.Group();
+
+  const trunk = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.15, 0.22, 2),
+    new THREE.MeshStandardMaterial({ color: 0x704525 })
+  );
+
+  trunk.position.y = 1;
+  group.add(trunk);
+
+  const leaves = new THREE.Mesh(
+    new THREE.ConeGeometry(1.5, 4, 8),
+    new THREE.MeshStandardMaterial({ color: 0x17652b })
+  );
+
+  leaves.position.y = 3.5;
+  group.add(leaves);
+
+  group.position.set(x, 0, z);
+  scene.add(group);
+  trees.push(group);
+}
+
+for (let i = 0; i < 35; i++) {
+  makeTree(-11, -i * 12);
+  makeTree(11, -i * 12);
+}
+
+// DASHBOARD
+
+const dashboard = new THREE.Group();
+camera.add(dashboard);
+scene.add(camera);
+
+const black = new THREE.MeshStandardMaterial({
+  color: 0x111111,
+  roughness: 0.55
+});
+
+const leather = new THREE.MeshStandardMaterial({
+  color: 0x292421,
+  roughness: 0.8
+});
+
+const dash = new THREE.Mesh(
+  new THREE.BoxGeometry(3.2, 0.5, 0.8),
+  leather
+);
+
+dash.position.set(0, -0.85, -1.2);
+dashboard.add(dash);
+
+// STEERING WHEEL
+
+const wheel = new THREE.Mesh(
+  new THREE.TorusGeometry(0.42, 0.065, 16, 48),
+  black
+);
+
+wheel.position.set(-0.45, -0.48, -1.0);
+dashboard.add(wheel);
+
+const hub = new THREE.Mesh(
+  new THREE.CylinderGeometry(0.12, 0.12, 0.12, 32),
+  black
+);
+
+hub.rotation.x = Math.PI / 2;
+hub.position.copy(wheel.position);
+dashboard.add(hub);
+
+// DASHBOARD DISPLAY
+
+const screen = new THREE.Mesh(
+  new THREE.BoxGeometry(0.65, 0.35, 0.04),
+  new THREE.MeshStandardMaterial({
+    color: 0x071b24,
+    emissive: 0x003344
+  })
+);
+
+screen.position.set(0.55, -0.65, -1.65);
+dashboard.add(screen);
+
+// WINDSHIELD FRAME
+
+const frame = new THREE.Mesh(
+  new THREE.BoxGeometry(3.8, 0.12, 0.15),
+  black
+);
+
+frame.position.set(0, 1.15, -1.5);
+dashboard.add(frame);
+
+// GAME CONTROLS
+
+const keys = {};
+
+window.addEventListener("keydown", e => {
+  keys[e.key.toLowerCase()] = true;
+});
+
+window.addEventListener("keyup", e => {
+  keys[e.key.toLowerCase()] = false;
+});
+
+let speed = 0;
+let steering = 0;
+let carX = 0;
+
+// GAME LOOP
+
+function animate() {
+  requestAnimationFrame(animate);
+
+  const accelerating = keys["w"] || keys["arrowup"];
+  const braking = keys["s"] || keys["arrowdown"];
+  const left = keys["a"] || keys["arrowleft"];
+  const right = keys["d"] || keys["arrowright"];
+
+  if (accelerating) speed = Math.min(speed + 0.12, 160);
+  else speed = Math.max(speed - 0.035, 0);
+
+  if (braking) speed = Math.max(speed - 0.35, 0);
+
+  if (left) steering = Math.min(steering + 0.025, 0.6);
+  else if (right) steering = Math.max(steering - 0.025, -0.6);
+  else steering *= 0.92;
+
+  carX += steering * speed * 0.0008;
+  carX = THREE.MathUtils.clamp(carX, -5, 5);
+
+  camera.position.x = carX;
+
+  wheel.rotation.z = -steering * 1.5;
+
+  const movement = speed * 0.018;
+
+  lines.forEach(line => {
+    line.position.z += movement;
+
+    if (line.position.z > 5) {
+      line.position.z -= 480;
+    }
+  });
+
+  trees.forEach(tree => {
+    tree.position.z += movement;
+
+    if (tree.position.z > 5) {
+      tree.position.z -= 420;
+    }
+  });
+
+  document.getElementById("speed").textContent =
+    Math.round(speed) + " KM/H";
+
+  renderer.render(scene, camera);
+}
+
+animate();
+
+// RESIZE
+
+window.addEventListener("resize", () => {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+});
 animate();
 
 // Window resizing
