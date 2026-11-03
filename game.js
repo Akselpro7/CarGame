@@ -1,4 +1,3 @@
-
 function updatePhysics(dt){
   const forward=keys["w"]||keys["arrowup"];
   const backward=keys["s"]||keys["arrowdown"];
