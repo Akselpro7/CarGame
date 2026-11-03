@@ -1,43 +1,53 @@
 <!DOCTYPE html>
 <html>
 <head>
-<title>Realistic Car Simulator</title>
+<meta charset="UTF-8">
+<title>Ultimate Driving Simulator</title>
+
 <style>
-* {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
-}
+* { margin: 0; padding: 0; box-sizing: border-box; }
 
 body {
   overflow: hidden;
-  font-family: Arial;
   background: #87ceeb;
+  font-family: Arial, sans-serif;
 }
 
-canvas {
-  display: block;
-}
+canvas { display: block; }
 
 #speed {
-  position: absolute;
+  position: fixed;
   bottom: 25px;
   right: 25px;
+  background: #101820dd;
   color: white;
-  background: #111d;
-  padding: 20px;
+  padding: 18px 25px;
   border-radius: 12px;
-  font-size: 26px;
+  font-size: 27px;
+  z-index: 5;
+  border: 1px solid #777;
 }
 
 #help {
-  position: absolute;
-  top: 20px;
-  left: 20px;
+  position: fixed;
+  top: 18px;
+  left: 18px;
+  background: #101820cc;
   color: white;
-  background: #111d;
-  padding: 12px;
+  padding: 13px;
   border-radius: 8px;
+  z-index: 5;
+}
+
+#location {
+  position: fixed;
+  top: 18px;
+  right: 18px;
+  background: #101820cc;
+  color: white;
+  padding: 13px;
+  border-radius: 8px;
+  z-index: 5;
 }
 </style>
 </head>
@@ -45,24 +55,36 @@ canvas {
 <body>
 
 <div id="speed">0 KM/H</div>
-<div id="help">W = Gas | S = Brake | A/D = Steering</div>
+<div id="help">
+  W / ↑ GAS<br>
+  S / ↓ BRAKE<br>
+  A / ← LEFT<br>
+  D / → RIGHT
+</div>
+<div id="location">OPEN WORLD</div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 
 <script>
+
+// =====================================
+// 1. WORLD SETUP
+// =====================================
+
 const scene = new THREE.Scene();
 
 scene.background = new THREE.Color(0x87ceeb);
-scene.fog = new THREE.Fog(0x87ceeb, 40, 250);
+scene.fog = new THREE.Fog(0x87ceeb, 100, 450);
 
 const camera = new THREE.PerspectiveCamera(
   75,
   window.innerWidth / window.innerHeight,
   0.1,
-  500
+  1000
 );
 
-camera.position.set(0, 1.6, 0);
+camera.position.set(0, 1.65, 0);
+camera.rotation.order = "YXZ";
 
 const renderer = new THREE.WebGLRenderer({
   antialias: true
@@ -71,157 +93,457 @@ const renderer = new THREE.WebGLRenderer({
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+if (renderer.outputColorSpace !== undefined) {
+  renderer.outputColorSpace = THREE.SRGBColorSpace;
+}
+
 document.body.appendChild(renderer.domElement);
 
-// LIGHTING
+scene.add(camera);
 
-scene.add(new THREE.HemisphereLight(0xffffff, 0x667755, 2));
+// =====================================
+// 2. LIGHTING
+// =====================================
 
-const sun = new THREE.DirectionalLight(0xffffff, 2);
-sun.position.set(-20, 40, 20);
+scene.add(new THREE.HemisphereLight(
+  0xbce7ff,
+  0x53613d,
+  1.8
+));
+
+const sun = new THREE.DirectionalLight(0xfff1d5, 2.5);
+
+sun.position.set(-80, 120, 50);
+sun.castShadow = true;
+sun.shadow.mapSize.width = 2048;
+sun.shadow.mapSize.height = 2048;
+
 scene.add(sun);
 
-// MATERIALS
+// =====================================
+// 3. MATERIALS
+// =====================================
 
-const roadMaterial = new THREE.MeshStandardMaterial({
-  color: 0x292929,
-  roughness: 0.9
-});
+function material(color, roughness = 0.85) {
+  return new THREE.MeshStandardMaterial({
+    color,
+    roughness
+  });
+}
 
-const grassMaterial = new THREE.MeshStandardMaterial({
-  color: 0x397b35
-});
+const grassMat = material(0x4d8738);
+const roadMat = material(0x292c30);
+const lineMat = material(0xf5f5f0);
+const trunkMat = material(0x604027);
+const leafMat = material(0x205b28);
+const buildingMat = [
+  material(0xaaa69d),
+  material(0xc6bcae),
+  material(0x777e86),
+  material(0xb4a18d)
+];
 
-const whiteMaterial = new THREE.MeshStandardMaterial({
-  color: 0xffffff
-});
-
-// GRASS
+// =====================================
+// 4. HUGE LANDSCAPE
+// =====================================
 
 const ground = new THREE.Mesh(
-  new THREE.PlaneGeometry(500, 500),
-  grassMaterial
+  new THREE.PlaneGeometry(1500, 1500),
+  grassMat
 );
 
 ground.rotation.x = -Math.PI / 2;
-ground.position.set(0, -0.1, -200);
+ground.position.set(0, -0.15, -350);
+ground.receiveShadow = true;
+
 scene.add(ground);
 
-// ROAD
+// Hills
+
+const hills = [];
+
+for (let i = 0; i < 22; i++) {
+
+  const hill = new THREE.Mesh(
+    new THREE.SphereGeometry(1, 20, 14),
+    material(
+      i % 2 ? 0x557c43 : 0x648c50
+    )
+  );
+
+  const side = i % 2 ? 1 : -1;
+
+  hill.scale.set(
+    25 + Math.random() * 35,
+    12 + Math.random() * 20,
+    35 + Math.random() * 35
+  );
+
+  hill.position.set(
+    side * (70 + Math.random() * 130),
+    -7,
+    -i * 35 - 50
+  );
+
+  scene.add(hill);
+  hills.push(hill);
+}
+
+// Distant mountains
+
+for (let i = 0; i < 16; i++) {
+
+  const mountain = new THREE.Mesh(
+    new THREE.ConeGeometry(
+      30 + Math.random() * 35,
+      65 + Math.random() * 50,
+      6
+    ),
+    material(0x718b99)
+  );
+
+  mountain.position.set(
+    (i - 8) * 65,
+    20,
+    -350 - Math.random() * 100
+  );
+
+  scene.add(mountain);
+}
+
+// =====================================
+// 5. BIG MULTI-LANE ROAD
+// =====================================
 
 const road = new THREE.Mesh(
-  new THREE.PlaneGeometry(14, 500),
-  roadMaterial
+  new THREE.PlaneGeometry(20, 1000),
+  roadMat
 );
 
 road.rotation.x = -Math.PI / 2;
-road.position.set(0, 0, -200);
+road.position.set(0, 0, -400);
+road.receiveShadow = true;
+
 scene.add(road);
 
-// ROAD MARKINGS
+// Road shoulders
+
+for (const x of [-10.5, 10.5]) {
+
+  const shoulder = new THREE.Mesh(
+    new THREE.BoxGeometry(1, 0.08, 1000),
+    material(0xb5b3a7)
+  );
+
+  shoulder.position.set(x, 0, -400);
+  scene.add(shoulder);
+}
+
+// Road markings
 
 const roadLines = [];
 
-for (let i = 0; i < 40; i++) {
-  const line = new THREE.Mesh(
-    new THREE.BoxGeometry(0.2, 0.03, 5),
-    whiteMaterial
-  );
+for (let i = 0; i < 70; i++) {
 
-  line.position.set(0, 0.02, -i * 12);
-  scene.add(line);
-  roadLines.push(line);
+  for (const x of [-3.3, 3.3]) {
+
+    const line = new THREE.Mesh(
+      new THREE.BoxGeometry(0.16, 0.025, 6),
+      lineMat
+    );
+
+    line.position.set(x, 0.04, -i * 14);
+    scene.add(line);
+    roadLines.push(line);
+  }
 }
 
-// TREES
+// Road edges
+
+for (const x of [-9.5, 9.5]) {
+
+  const edge = new THREE.Mesh(
+    new THREE.BoxGeometry(0.2, 0.03, 1000),
+    lineMat
+  );
+
+  edge.position.set(x, 0.04, -400);
+  scene.add(edge);
+}
+
+// =====================================
+// 6. FORESTS
+// =====================================
 
 const trees = [];
 
-function createTree(x, z) {
-  const tree = new THREE.Group();
+function createTree(x, z, scale = 1) {
+
+  const group = new THREE.Group();
 
   const trunk = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.15, 0.2, 2),
-    new THREE.MeshStandardMaterial({color: 0x654321})
+    new THREE.CylinderGeometry(0.2, 0.3, 3, 8),
+    trunkMat
   );
 
-  trunk.position.y = 1;
-  tree.add(trunk);
+  trunk.position.y = 1.5;
+  group.add(trunk);
 
   const leaves = new THREE.Mesh(
-    new THREE.ConeGeometry(1.4, 3.5, 8),
-    new THREE.MeshStandardMaterial({color: 0x145c24})
+    new THREE.ConeGeometry(1.8, 5, 9),
+    leafMat
   );
 
-  leaves.position.y = 3.5;
-  tree.add(leaves);
+  leaves.position.y = 4.5;
+  group.add(leaves);
 
-  tree.position.set(x, 0, z);
-  scene.add(tree);
-  trees.push(tree);
+  const top = new THREE.Mesh(
+    new THREE.ConeGeometry(1.3, 3.5, 9),
+    material(0x286b31)
+  );
+
+  top.position.y = 6;
+  group.add(top);
+
+  group.scale.setScalar(scale);
+  group.position.set(x, 0, z);
+
+  scene.add(group);
+  trees.push(group);
 }
 
-for (let i = 0; i < 40; i++) {
-  createTree(-11, -i * 12);
-  createTree(11, -i * 12);
+for (let i = 0; i < 65; i++) {
+
+  const z = -i * 9;
+
+  createTree(-14 - Math.random() * 20, z, 0.8 + Math.random());
+  createTree(14 + Math.random() * 20, z, 0.8 + Math.random());
 }
 
-// CAR INTERIOR
+// =====================================
+// 7. BUILDINGS
+// =====================================
+
+const buildings = [];
+
+function createBuilding(x, z) {
+
+  const group = new THREE.Group();
+
+  const width = 8 + Math.random() * 9;
+  const height = 10 + Math.random() * 25;
+  const depth = 8 + Math.random() * 8;
+
+  const building = new THREE.Mesh(
+    new THREE.BoxGeometry(width, height, depth),
+    buildingMat[Math.floor(Math.random() * buildingMat.length)]
+  );
+
+  building.position.y = height / 2;
+  group.add(building);
+
+  // Windows
+
+  const windowMat = new THREE.MeshStandardMaterial({
+    color: 0x263e4c,
+    roughness: 0.3,
+    metalness: 0.2
+  });
+
+  for (let y = 3; y < height - 1; y += 4) {
+
+    for (let w = -width / 2 + 1.5; w < width / 2 - 1; w += 3) {
+
+      const windowMesh = new THREE.Mesh(
+        new THREE.BoxGeometry(1.3, 1.8, 0.08),
+        windowMat
+      );
+
+      windowMesh.position.set(w, y, depth / 2 + 0.05);
+      group.add(windowMesh);
+    }
+  }
+
+  group.position.set(x, 0, z);
+
+  scene.add(group);
+  buildings.push(group);
+}
+
+for (let i = 0; i < 20; i++) {
+
+  createBuilding(-42 - Math.random() * 20, -i * 35 - 30);
+  createBuilding(42 + Math.random() * 20, -i * 35 - 30);
+}
+
+// =====================================
+// 8. STREETLIGHTS
+// =====================================
+
+const lights = [];
+
+function createStreetlight(x, z) {
+
+  const group = new THREE.Group();
+
+  const pole = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.12, 0.17, 8, 8),
+    material(0x55585b, 0.5)
+  );
+
+  pole.position.y = 4;
+  group.add(pole);
+
+  const arm = new THREE.Mesh(
+    new THREE.BoxGeometry(2, 0.12, 0.12),
+    material(0x55585b)
+  );
+
+  arm.position.set(x > 0 ? -0.9 : 0.9, 7.8, 0);
+  group.add(arm);
+
+  const bulb = new THREE.Mesh(
+    new THREE.BoxGeometry(0.8, 0.18, 0.4),
+    material(0xfff1bd, 0.3)
+  );
+
+  bulb.position.set(x > 0 ? -1.5 : 1.5, 7.7, 0);
+  group.add(bulb);
+
+  group.position.set(x, 0, z);
+
+  scene.add(group);
+  lights.push(group);
+}
+
+for (let i = 0; i < 30; i++) {
+  createStreetlight(-12, -i * 22);
+  createStreetlight(12, -i * 22);
+}
+
+// =====================================
+// 9. CAR INTERIOR
+// =====================================
 
 const interior = new THREE.Group();
+
 camera.add(interior);
-scene.add(camera);
 
-const black = new THREE.MeshStandardMaterial({
-  color: 0x111111,
-  roughness: 0.6
-});
+const blackMat = material(0x111316, 0.45);
+const leatherMat = material(0x282321, 0.8);
+const metalMat = material(0x777c80, 0.4);
 
-const dashboard = new THREE.Mesh(
-  new THREE.BoxGeometry(3.2, 0.5, 0.8),
-  new THREE.MeshStandardMaterial({color: 0x24201d})
+// Dashboard
+
+const dash = new THREE.Mesh(
+  new THREE.BoxGeometry(3.8, 0.65, 1.1),
+  leatherMat
 );
 
-dashboard.position.set(0, -0.85, -1.2);
-interior.add(dashboard);
+dash.position.set(0, -0.85, -1.15);
+interior.add(dash);
 
-// STEERING WHEEL
+// Dashboard top
+
+const dashTop = new THREE.Mesh(
+  new THREE.BoxGeometry(3.9, 0.13, 1.1),
+  blackMat
+);
+
+dashTop.position.set(0, -0.5, -1.15);
+interior.add(dashTop);
+
+// Steering wheel
+
+const wheelGroup = new THREE.Group();
 
 const wheel = new THREE.Mesh(
-  new THREE.TorusGeometry(0.42, 0.06, 16, 48),
-  black
+  new THREE.TorusGeometry(0.42, 0.065, 16, 48),
+  blackMat
 );
 
-wheel.position.set(-0.45, -0.48, -1);
-interior.add(wheel);
+wheelGroup.add(wheel);
 
-// WHEEL CENTER
-
-const hub = new THREE.Mesh(
-  new THREE.CylinderGeometry(0.12, 0.12, 0.12, 32),
-  black
+const wheelHub = new THREE.Mesh(
+  new THREE.CylinderGeometry(0.13, 0.13, 0.12, 24),
+  metalMat
 );
 
-hub.rotation.x = Math.PI / 2;
-hub.position.copy(wheel.position);
-interior.add(hub);
+wheelHub.rotation.x = Math.PI / 2;
+wheelGroup.add(wheelHub);
 
-// WINDSHIELD FRAME
+// Steering spokes
 
-const frame = new THREE.Mesh(
-  new THREE.BoxGeometry(3.8, 0.12, 0.15),
-  black
+for (let i = 0; i < 3; i++) {
+
+  const spoke = new THREE.Mesh(
+    new THREE.BoxGeometry(0.07, 0.36, 0.07),
+    blackMat
+  );
+
+  spoke.rotation.z = i * Math.PI * 2 / 3;
+  wheelGroup.add(spoke);
+}
+
+wheelGroup.position.set(-0.55, -0.48, -0.9);
+interior.add(wheelGroup);
+
+// Instrument panel
+
+const instrument = new THREE.Mesh(
+  new THREE.BoxGeometry(1.5, 0.35, 0.1),
+  material(0x071b25)
 );
 
-frame.position.set(0, 1.15, -1.5);
-interior.add(frame);
+instrument.position.set(0, -0.45, -1.7);
+interior.add(instrument);
 
-// CONTROLS
+// Windshield frame
+
+for (const x of [-1.8, 1.8]) {
+
+  const pillar = new THREE.Mesh(
+    new THREE.BoxGeometry(0.13, 2.8, 0.18),
+    blackMat
+  );
+
+  pillar.position.set(x, 0.5, -1.6);
+  pillar.rotation.z = x > 0 ? -0.08 : 0.08;
+  interior.add(pillar);
+}
+
+// Roof edge
+
+const roof = new THREE.Mesh(
+  new THREE.BoxGeometry(3.7, 0.18, 0.5),
+  blackMat
+);
+
+roof.position.set(0, 1.8, -1.5);
+interior.add(roof);
+
+// Rearview mirror
+
+const mirror = new THREE.Mesh(
+  new THREE.BoxGeometry(0.65, 0.22, 0.12),
+  blackMat
+);
+
+mirror.position.set(0, 1.05, -1.1);
+interior.add(mirror);
+
+// =====================================
+// 10. DRIVING CONTROLS
+// =====================================
 
 const keys = {};
 
 window.addEventListener("keydown", e => {
   keys[e.key.toLowerCase()] = true;
+
+  if (e.key.startsWith("Arrow")) e.preventDefault();
 });
 
 window.addEventListener("keyup", e => {
@@ -232,52 +554,109 @@ let speed = 0;
 let steering = 0;
 let carX = 0;
 
-// GAME
+// =====================================
+// 11. GAME LOOP
+// =====================================
 
 function animate() {
+
   requestAnimationFrame(animate);
 
+  // Gas
+
   if (keys["w"] || keys["arrowup"]) {
-    speed = Math.min(speed + 0.15, 160);
+    speed = Math.min(speed + 0.16, 200);
   } else {
-    speed = Math.max(speed - 0.04, 0);
+    speed = Math.max(speed - 0.035, 0);
   }
+
+  // Brake
 
   if (keys["s"] || keys["arrowdown"]) {
-    speed = Math.max(speed - 0.4, 0);
+    speed = Math.max(speed - 0.45, 0);
   }
 
+  // STEERING FIX
+  // A = LEFT
+  // D = RIGHT
+
   if (keys["a"] || keys["arrowleft"]) {
-    steering = Math.min(steering + 0.025, 0.6);
-  } else if (keys["d"] || keys["arrowright"]) {
-    steering = Math.max(steering - 0.025, -0.6);
-  } else {
+    steering = Math.min(steering + 0.025, 0.65);
+  }
+
+  else if (keys["d"] || keys["arrowright"]) {
+    steering = Math.max(steering - 0.025, -0.65);
+  }
+
+  else {
     steering *= 0.92;
   }
 
-  carX += steering * speed * 0.0008;
-  carX = THREE.MathUtils.clamp(carX, -5, 5);
+  // Corrected camera direction
+
+  carX -= steering * speed * 0.0008;
+
+  carX = THREE.MathUtils.clamp(carX, -7, 7);
 
   camera.position.x = carX;
-  wheel.rotation.z = -steering * 1.5;
+
+  // Steering wheel
+
+  wheelGroup.rotation.z = -steering * 1.8;
+
+  // Movement
 
   const movement = speed * 0.018;
 
+  // Road markings
+
   roadLines.forEach(line => {
+
     line.position.z += movement;
 
-    if (line.position.z > 5) {
-      line.position.z -= 480;
+    if (line.position.z > 8) {
+      line.position.z -= 980;
     }
+
   });
+
+  // Forests
 
   trees.forEach(tree => {
+
     tree.position.z += movement;
 
-    if (tree.position.z > 5) {
-      tree.position.z -= 480;
+    if (tree.position.z > 15) {
+      tree.position.z -= 585;
     }
+
   });
+
+  // Buildings
+
+  buildings.forEach(building => {
+
+    building.position.z += movement;
+
+    if (building.position.z > 30) {
+      building.position.z -= 700;
+    }
+
+  });
+
+  // Streetlights
+
+  lights.forEach(light => {
+
+    light.position.z += movement;
+
+    if (light.position.z > 20) {
+      light.position.z -= 660;
+    }
+
+  });
+
+  // Speed display
 
   document.getElementById("speed").textContent =
     Math.round(speed) + " KM/H";
@@ -287,14 +666,23 @@ function animate() {
 
 animate();
 
-// RESIZE
+// =====================================
+// 12. SCREEN RESIZING
+// =====================================
 
 window.addEventListener("resize", () => {
-  camera.aspect = window.innerWidth / window.innerHeight;
-  camera.updateProjectionMatrix();
-  renderer.setSize(window.innerWidth, window.innerHeight);
-});
-</script>
 
+  camera.aspect = window.innerWidth / window.innerHeight;
+
+  camera.updateProjectionMatrix();
+
+  renderer.setSize(
+    window.innerWidth,
+    window.innerHeight
+  );
+
+});
+
+</script>
 </body>
 </html>
