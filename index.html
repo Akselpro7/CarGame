@@ -236,17 +236,14 @@ function createCar(group,color=0x168bd4){
   }
  }
 
- // Interior
  box(group,0,1.35,-.3,2.1,.12,2.1,blackMat);
  box(group,0,1.35,1.2,2.3,.22,.45,blackMat);
  for(const x of [-.65,.65]){
   box(group,x,1.15,-.65,.65,.65,.6,blackMat);
  }
- // Steering wheel
  const steering=new THREE.Mesh(new THREE.TorusGeometry(.28,.045,8,20),blackMat);
  steering.position.set(-.65,1.65,1.05);
  group.add(steering);
- // Driver
  box(group,-.65,1.65,-.1,.42,.65,.38,mat(0x202a38));
  const head=new THREE.Mesh(new THREE.SphereGeometry(.2,12,10),mat(0xd3a17d));
  head.position.set(-.65,2.1,-.1);
@@ -383,31 +380,165 @@ addEventListener("keydown",e=>{
  if(e.key.toLowerCase()==="r")repairCar();
 });
 addEventListener("keyup",e=>keys[e.key.toLowerCase()]=false);
+
+// ================= DRIVING =================
+function updateDriving(dt){
+ let accel=0;
+ if(keys["w"]||keys["arrowup"])accel=28;
+ if(keys["s"]||keys["arrowdown"])accel=-18;
+ if(keys[" "])velocity*=.92;
+ if((keys["shift"]||keys["shiftleft"])&&nitro>0&&accel>0){
+  accel*=1.8;nitro=Math.max(0,nitro-dt*25);
+ }else nitro=Math.min(100,nitro+dt*8);
+
+ velocity+=(accel-velocity*1.8)*dt;
+ velocity=Math.max(-25,Math.min(55,velocity));
+
+ let steerInput=0;
+ if(keys["a"]||keys["arrowleft"])steerInput=1;
+ if(keys["d"]||keys["arrowright"])steerInput=-1;
+ steer+=(steerInput-steer)*dt*6;
+ yaw+=steer*velocity*dt*.04;
+
+ car.position.x-=Math.sin(yaw)*velocity*dt;
+ car.position.z+=Math.cos(yaw)*velocity*dt;
+ car.rotation.y=yaw;
+ car.position.y=0;
+}
+
+function updateWalking(dt){
+ let mx=0,mz=0;
+ if(keys["w"]||keys["arrowup"])mz=1;
+ if(keys["s"]||keys["arrowdown"])mz=-1;
+ if(keys["a"]||keys["arrowleft"])mx=-1;
+ if(keys["d"]||keys["arrowright"])mx=1;
+ if(mx||mz){
+  const len=Math.hypot(mx,mz);
+  mx/=len;mz/=len;
+  player.position.x+=mx*12*dt;
+  player.position.z+=mz*12*dt;
+  player.rotation.y=Math.atan2(mx,mz);
+ }
+}
+
+// ================= TRAFFIC & POLICE =================
+function updateTraffic(dt){
+ for(const t of traffic){
+  t.group.position.x+=t.dir*t.speed*dt*0.15;
+  if(Math.abs(t.group.position.x)>500)t.group.position.x*=-1;
+ }
+}
+function updatePolice(dt){
+ // simple follow logic can be expanded later
+}
+function updateSparks(dt){}
+
+// ================= CAMERA =================
+function updateCamera(dt){
+ const target=driving?car:player;
+ let desired,look;
+
+ if(cameraMode===0){ // chase
+  desired=new THREE.Vector3(
+   target.position.x+Math.sin(yaw)*14,
+   target.position.y+6,
+   target.position.z-Math.cos(yaw)*14
+  );
+  look=new THREE.Vector3(target.position.x,2,target.position.z);
+ }else if(cameraMode===1){ // top
+  desired=new THREE.Vector3(target.position.x,35,target.position.z);
+  look=target.position.clone();
+ }else{ // first person
+  desired=new THREE.Vector3(target.position.x,target.position.y+2.2,target.position.z);
+  look=new THREE.Vector3(
+   target.position.x-Math.sin(yaw)*10,
+   target.position.y+1.5,
+   target.position.z+Math.cos(yaw)*10
+  );
+ }
+
+ camera.position.lerp(desired,1-Math.pow(.001,dt));
+ camera.lookAt(look);
+}
+
+// ================= MISSIONS =================
+function updateMission(){
+ if(!missionActive||!missionTarget)return;
+ const target=driving?car:player;
+ if(dist(target.position,missionTarget)<8){
+  money+=missionReward;
+  missionActive=false;
+  marker.visible=false;
+  document.getElementById("mission").textContent="Mission completed!";
+  showMessage("MISSION COMPLETE +$"+missionReward);
+ }
+}
+
+// ================= HUD =================
+function updateHUD(){
+ document.getElementById("cash").textContent="$"+money.toLocaleString();
+ document.getElementById("speed").textContent=Math.round(Math.abs(velocity)*3.6);
+ document.getElementById("gear").textContent=!driving?"ON FOOT":velocity<0?"REVERSE":"DRIVE";
+ document.getElementById("healthFill").style.width=health+"%";
+ document.getElementById("nitroFill").style.width=nitro+"%";
+ document.getElementById("wanted").textContent="★".repeat(wanted)+"☆".repeat(5-wanted);
+}
+function updateMap(){
+ const c=document.getElementById("minimap");
+ const ctx=c.getContext("2d");
+ ctx.clearRect(0,0,200,200);
+ ctx.fillStyle="#243b2a";
+ ctx.fillRect(0,0,200,200);
+ ctx.strokeStyle="#89959a";
+ ctx.lineWidth=5;
+ for(let i=0;i<200;i+=40){
+  ctx.beginPath();ctx.moveTo(i,0);ctx.lineTo(i,200);ctx.stroke();
+  ctx.beginPath();ctx.moveTo(0,i);ctx.lineTo(200,i);ctx.stroke();
+ }
+ const target=driving?car:player;
+ ctx.fillStyle="#00cfff";
+ ctx.beginPath();ctx.arc(100,100,6,0,Math.PI*2);ctx.fill();
+ if(missionActive){
+  ctx.fillStyle="#ffdc33";
+  ctx.beginPath();
+  ctx.arc(100+(missionTarget.x-target.position.x)*.15,100+(missionTarget.z-target.position.z)*.15,5,0,Math.PI*2);
+  ctx.fill();
+ }
+}
+
+// ================= MAIN LOOP =================
+function animate(){
+ requestAnimationFrame(animate);
+ const dt=Math.min(clock.getDelta(),.04);
+
+ if(!paused){
+  if(driving)updateDriving(dt);
+  else updateWalking(dt);
+
+  updateTraffic(dt);
+  updatePolice(dt);
+  updateSparks(dt);
+  updateMission();
+  updateCamera(dt);
+  updateHUD();
+  updateMap();
+
+  if(missionActive)marker.rotation.y+=dt;
+ }
+ renderer.render(scene,camera);
+}
+
+updateCamera(.016);
+animate();
+
 addEventListener("resize",()=>{
  camera.aspect=innerWidth/innerHeight;
  camera.updateProjectionMatrix();
  renderer.setSize(innerWidth,innerHeight);
 });
 
-// ================= UPDATE =================
-function updateHUD(){
- document.getElementById("cash").textContent="$"+money.toLocaleString();
- document.getElementById("speed").textContent=Math.abs(Math.round(velocity*3.6));
- document.getElementById("gear").textContent=velocity>=0?"DRIVE":"REVERSE";
- document.getElementById("healthFill").style.width=health+"%";
- document.getElementById("nitroFill").style.width=nitro+"%";
- const stars="★".repeat(wanted)+"☆".repeat(5-wanted);
- document.getElementById("wanted").textContent=stars;
-}
-
-function updateMinimap(){
- const ctx=document.getElementById("minimap").getContext("2d");
- ctx.fillStyle="#0a1218";
- ctx.fillRect(0,0,200,200);
- ctx.save();
- ctx.translate(100,100);
- ctx.rotate(-yaw);
- // roads
- ctx.strokeStyle="#444";
- ctx.lineWidth=4;
- for(let i=-5;i<=5;i++){
+showMessage("WELCOME TO CITY LIFE 5");
+})();
+</script>
+</body>
+</html>
