@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>NIGHT HEAT - Street Racing</title>
+<title>NIGHT HEAT - First Person</title>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body { overflow: hidden; background: #000; font-family: Arial, sans-serif; color: white; }
@@ -18,9 +18,9 @@
 
   #title {
     position: absolute;
-    top: 20px;
-    left: 25px;
-    font-size: 28px;
+    top: 18px;
+    left: 22px;
+    font-size: 26px;
     font-weight: 900;
     letter-spacing: 3px;
     color: #ff2a6d;
@@ -29,31 +29,31 @@
 
   #speed {
     position: absolute;
-    bottom: 40px;
-    right: 40px;
-    font-size: 72px;
+    bottom: 35px;
+    right: 35px;
+    font-size: 68px;
     font-weight: 900;
     text-align: right;
     line-height: 1;
   }
   #speed span {
-    font-size: 22px;
+    font-size: 20px;
     opacity: 0.7;
   }
 
   #nitro-bar {
     position: absolute;
-    bottom: 40px;
-    left: 40px;
-    width: 220px;
+    bottom: 35px;
+    left: 35px;
+    width: 210px;
   }
   #nitro-bar .label {
-    font-size: 14px;
-    margin-bottom: 6px;
+    font-size: 13px;
+    margin-bottom: 5px;
     color: #00f0ff;
   }
   #nitro-bar .bar {
-    height: 14px;
+    height: 13px;
     background: #222;
     border-radius: 10px;
     overflow: hidden;
@@ -63,16 +63,15 @@
     height: 100%;
     width: 100%;
     background: linear-gradient(90deg, #00f0ff, #0088ff);
-    transition: width 0.1s;
   }
 
   #wanted {
     position: absolute;
-    top: 25px;
-    right: 40px;
-    font-size: 28px;
+    top: 22px;
+    right: 35px;
+    font-size: 26px;
     color: #ffcc00;
-    letter-spacing: 6px;
+    letter-spacing: 5px;
   }
 
   #message {
@@ -80,7 +79,7 @@
     top: 50%;
     left: 50%;
     transform: translate(-50%, -50%);
-    font-size: 32px;
+    font-size: 30px;
     font-weight: bold;
     text-shadow: 0 0 20px black;
     display: none;
@@ -89,11 +88,11 @@
 
   #help {
     position: absolute;
-    bottom: 20px;
+    bottom: 15px;
     left: 50%;
     transform: translateX(-50%);
-    font-size: 13px;
-    opacity: 0.6;
+    font-size: 12px;
+    opacity: 0.55;
     text-align: center;
   }
 </style>
@@ -125,7 +124,7 @@
   // ================= SETUP =================
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(0x050510);
-  scene.fog = new THREE.Fog(0x050510, 80, 350);
+  scene.fog = new THREE.Fog(0x050510, 90, 380);
 
   const camera = new THREE.PerspectiveCamera(75, innerWidth / innerHeight, 0.1, 1000);
   const renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -134,94 +133,199 @@
   document.body.appendChild(renderer.domElement);
 
   // Lights
-  scene.add(new THREE.AmbientLight(0x222244, 1.5));
-  const sun = new THREE.DirectionalLight(0x6688ff, 1.2);
+  scene.add(new THREE.AmbientLight(0x222244, 1.4));
+  const sun = new THREE.DirectionalLight(0x6688ff, 1.1);
   sun.position.set(50, 100, 30);
   scene.add(sun);
 
-  // Neon street lights effect
-  const neon = new THREE.PointLight(0xff2a6d, 2, 80);
+  const neon = new THREE.PointLight(0xff2a6d, 2.2, 90);
   neon.position.set(0, 8, 0);
   scene.add(neon);
 
-  // ================= GROUND & ROAD =================
-  const roadMat = new THREE.MeshStandardMaterial({ color: 0x111118, roughness: 0.1, roughness: 0.9 });
-  const road = new THREE.Mesh(new THREE.PlaneGeometry(40, 2000), roadMat);
+  // ================= ROAD =================
+  const roadMat = new THREE.MeshStandardMaterial({ color: 0x111118, metalness: 0.1, roughness: 0.9 });
+  const road = new THREE.Mesh(new THREE.PlaneGeometry(42, 2200), roadMat);
   road.rotation.x = -Math.PI / 2;
   scene.add(road);
 
-  // Road lines
   const lineMat = new THREE.MeshBasicMaterial({ color: 0xffcc00 });
-  for (let z = -900; z < 900; z += 25) {
-    const line = new THREE.Mesh(new THREE.PlaneGeometry(0.4, 8), lineMat);
+  for (let z = -1000; z < 1000; z += 28) {
+    const line = new THREE.Mesh(new THREE.PlaneGeometry(0.4, 9), lineMat);
     line.rotation.x = -Math.PI / 2;
     line.position.set(0, 0.02, z);
     scene.add(line);
   }
 
-  // Sidewalks / barriers
   const barrierMat = new THREE.MeshStandardMaterial({ color: 0x222230 });
   for (let side of [-1, 1]) {
-    const barrier = new THREE.Mesh(new THREE.BoxGeometry(3, 1.2, 2000), barrierMat);
-    barrier.position.set(side * 22, 0.6, 0);
+    const barrier = new THREE.Mesh(new THREE.BoxGeometry(3, 1.2, 2200), barrierMat);
+    barrier.position.set(side * 23, 0.6, 0);
     scene.add(barrier);
   }
 
-  // Buildings on the sides
+  // Buildings
   function makeBuilding(x, z) {
-    const h = 15 + Math.random() * 40;
+    const h = 18 + Math.random() * 45;
     const mat = new THREE.MeshStandardMaterial({
-      color: new THREE.Color().setHSL(0.6 + Math.random() * 0.1, 0.3, 0.15 + Math.random() * 0.1)
+      color: new THREE.Color().setHSL(0.6 + Math.random() * 0.1, 0.3, 0.12 + Math.random() * 0.1)
     });
-    const b = new THREE.Mesh(new THREE.BoxGeometry(18 + Math.random() * 10, h, 18 + Math.random() * 10), mat);
+    const b = new THREE.Mesh(new THREE.BoxGeometry(18 + Math.random() * 12, h, 18 + Math.random() * 12), mat);
     b.position.set(x, h / 2, z);
     scene.add(b);
 
-    // Windows
-    const winMat = new THREE.MeshBasicMaterial({ color: 0x88ccff, transparent: true, opacity: 0.7 });
-    for (let y = 4; y < h - 3; y += 5) {
-      for (let wx = -6; wx <= 6; wx += 4) {
-        const win = new THREE.Mesh(new THREE.PlaneGeometry(2, 2.5), winMat);
-        win.position.set(x + wx, y, z + (x > 0 ? -9.1 : 9.1));
+    const winMat = new THREE.MeshBasicMaterial({ color: 0x88ccff, transparent: true, opacity: 0.65 });
+    for (let y = 5; y < h - 4; y += 5) {
+      for (let wx = -7; wx <= 7; wx += 4.5) {
+        const win = new THREE.Mesh(new THREE.PlaneGeometry(2.1, 2.6), winMat);
+        win.position.set(x + wx, y, z + (x > 0 ? -9.2 : 9.2));
         win.rotation.y = x > 0 ? Math.PI : 0;
         scene.add(win);
       }
     }
   }
 
-  for (let z = -800; z < 800; z += 45) {
-    makeBuilding(-35 - Math.random() * 15, z + Math.random() * 20);
-    makeBuilding(35 + Math.random() * 15, z + Math.random() * 20);
+  for (let z = -900; z < 900; z += 48) {
+    makeBuilding(-38 - Math.random() * 18, z + Math.random() * 25);
+    makeBuilding(38 + Math.random() * 18, z + Math.random() * 25);
   }
 
   // ================= CAR =================
   const car = new THREE.Group();
-  const bodyMat = new THREE.MeshStandardMaterial({ color: 0xff2a6d, metalness: 0.7, roughness: 0.25 });
-  const darkMat = new THREE.MeshStandardMaterial({ color: 0x111111 });
-  const glassMat = new THREE.MeshStandardMaterial({ color: 0x88aacc, metalness: 0.9, roughness: 0.1, transparent: true, opacity: 0.7 });
+
+  const bodyMat = new THREE.MeshStandardMaterial({ color: 0xe11d48, metalness: 0.75, roughness: 0.22 });
+  const darkMat = new THREE.MeshStandardMaterial({ color: 0x0f0f12, metalness: 0.3, roughness: 0.7 });
+  const glassMat = new THREE.MeshStandardMaterial({ color: 0x88aacc, metalness: 0.9, roughness: 0.05, transparent: true, opacity: 0.55 });
+  const seatMat = new THREE.MeshStandardMaterial({ color: 0x1c1c1c });
+  const skinMat = new THREE.MeshStandardMaterial({ color: 0xd2a679 });
+  const shirtMat = new THREE.MeshStandardMaterial({ color: 0x1e293b });
+  const wheelMat = new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.9 });
 
   // Body
-  const body = new THREE.Mesh(new THREE.BoxGeometry(2.2, 0.7, 5), bodyMat);
-  body.position.y = 0.7;
+  const body = new THREE.Mesh(new THREE.BoxGeometry(2.15, 0.65, 4.8), bodyMat);
+  body.position.y = 0.65;
   car.add(body);
 
-  // Cabin
+  // Hood
+  const hood = new THREE.Mesh(new THREE.BoxGeometry(2.0, 0.22, 1.35), bodyMat);
+  hood.position.set(0, 1.0, 1.65);
+  car.add(hood);
+
+  // Cabin glass
   const cabin = new THREE.Mesh(new THREE.BoxGeometry(1.9, 0.6, 2.4), glassMat);
-  cabin.position.set(0, 1.25, -0.3);
+  cabin.position.set(0, 1.25, -0.2);
   car.add(cabin);
 
+  // Trunk
+  const trunk = new THREE.Mesh(new THREE.BoxGeometry(2.0, 0.3, 1.0), bodyMat);
+  trunk.position.set(0, 0.95, -2.05);
+  car.add(trunk);
+
   // Wheels
-  const wheelGeo = new THREE.CylinderGeometry(0.4, 0.4, 0.35, 16);
-  const wheelMat = new THREE.MeshStandardMaterial({ color: 0x111111 });
+  const wheelGeo = new THREE.CylinderGeometry(0.41, 0.41, 0.3, 16);
   const wheels = [];
-  [[-1.1, 1.5], [1.1, 1.5], [-1.1, -1.6], [1.1, -1.6]].forEach(([x, z]) => {
+  [[-1.12, 1.5], [1.12, 1.5], [-1.12, -1.6], [1.12, -1.6]].forEach(([x, z]) => {
     const w = new THREE.Mesh(wheelGeo, wheelMat);
     w.rotation.z = Math.PI / 2;
-    w.position.set(x, 0.4, z);
+    w.position.set(x, 0.41, z);
     car.add(w);
     wheels.push(w);
   });
 
+  // ========== INTERIOR ==========
+  const floor = new THREE.Mesh(new THREE.BoxGeometry(1.85, 0.06, 3.3), darkMat);
+  floor.position.set(0, 0.82, -0.15);
+  car.add(floor);
+
+  const dash = new THREE.Mesh(new THREE.BoxGeometry(1.85, 0.32, 0.55), darkMat);
+  dash.position.set(0, 1.22, 1.1);
+  car.add(dash);
+
+  const dashTop = new THREE.Mesh(new THREE.BoxGeometry(1.85, 0.08, 0.5), darkMat);
+  dashTop.position.set(0, 1.38, 1.05);
+  car.add(dashTop);
+
+  const consoleBox = new THREE.Mesh(new THREE.BoxGeometry(0.32, 0.3, 1.5), darkMat);
+  consoleBox.position.set(0, 1.0, 0.15);
+  car.add(consoleBox);
+
+  // Seats
+  const driverSeat = new THREE.Mesh(new THREE.BoxGeometry(0.62, 0.4, 0.8), seatMat);
+  driverSeat.position.set(-0.52, 1.0, -0.25);
+  car.add(driverSeat);
+
+  const driverBack = new THREE.Mesh(new THREE.BoxGeometry(0.62, 0.65, 0.12), seatMat);
+  driverBack.position.set(-0.52, 1.35, -0.65);
+  car.add(driverBack);
+
+  const passSeat = new THREE.Mesh(new THREE.BoxGeometry(0.62, 0.4, 0.8), seatMat);
+  passSeat.position.set(0.52, 1.0, -0.25);
+  car.add(passSeat);
+
+  const passBack = new THREE.Mesh(new THREE.BoxGeometry(0.62, 0.65, 0.12), seatMat);
+  passBack.position.set(0.52, 1.35, -0.65);
+  car.add(passBack);
+
+  // ========== DRIVER ==========
+  const driverBody = new THREE.Mesh(new THREE.BoxGeometry(0.38, 0.48, 0.32), shirtMat);
+  driverBody.position.set(-0.52, 1.42, -0.2);
+  car.add(driverBody);
+
+  const head = new THREE.Mesh(new THREE.SphereGeometry(0.17, 12, 10), skinMat);
+  head.position.set(-0.52, 1.82, -0.15);
+  car.add(head);
+
+  // Arms
+  const armGeo = new THREE.BoxGeometry(0.11, 0.11, 0.42);
+  const leftArm = new THREE.Mesh(armGeo, shirtMat);
+  leftArm.position.set(-0.72, 1.42, 0.12);
+  leftArm.rotation.x = -0.55;
+  car.add(leftArm);
+
+  const rightArm = new THREE.Mesh(armGeo, shirtMat);
+  rightArm.position.set(-0.32, 1.42, 0.12);
+  rightArm.rotation.x = -0.55;
+  car.add(rightArm);
+
+  // Hands
+  const handGeo = new THREE.SphereGeometry(0.065, 8, 8);
+  const leftHand = new THREE.Mesh(handGeo, skinMat);
+  leftHand.position.set(-0.72, 1.28, 0.48);
+  car.add(leftHand);
+
+  const rightHand = new THREE.Mesh(handGeo, skinMat);
+  rightHand.position.set(-0.32, 1.28, 0.48);
+  car.add(rightHand);
+
+  // ========== STEERING WHEEL ==========
+  const steeringGroup = new THREE.Group();
+  steeringGroup.position.set(-0.52, 1.28, 0.52);
+  steeringGroup.rotation.x = -0.35;
+
+  const wheelRing = new THREE.Mesh(
+    new THREE.TorusGeometry(0.29, 0.035, 10, 32),
+    new THREE.MeshStandardMaterial({ color: 0x222222, roughness: 0.4 })
+  );
+  steeringGroup.add(wheelRing);
+
+  const hub = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.09, 0.09, 0.06, 16),
+    new THREE.MeshStandardMaterial({ color: 0x333333 })
+  );
+  hub.rotation.x = Math.PI / 2;
+  steeringGroup.add(hub);
+
+  for (let i = 0; i < 3; i++) {
+    const spoke = new THREE.Mesh(
+      new THREE.BoxGeometry(0.22, 0.03, 0.04),
+      new THREE.MeshStandardMaterial({ color: 0x444444 })
+    );
+    spoke.rotation.z = (i * Math.PI * 2) / 3;
+    spoke.position.x = Math.cos(spoke.rotation.z) * 0.12;
+    spoke.position.y = Math.sin(spoke.rotation.z) * 0.12;
+    steeringGroup.add(spoke);
+  }
+
+  car.add(steeringGroup);
   scene.add(car);
   car.position.set(0, 0, 0);
 
@@ -233,7 +337,6 @@
     pBody.position.y = 0.7;
     p.add(pBody);
 
-    // Lights
     const red = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.2, 0.4), new THREE.MeshBasicMaterial({ color: 0xff0000 }));
     red.position.set(-0.5, 1.4, 0);
     p.add(red);
@@ -242,10 +345,10 @@
     p.add(blue);
 
     scene.add(p);
-    p.position.set((Math.random() - 0.5) * 20, 0, -200 - Math.random() * 300);
-    policeCars.push({ group: p, speed: 28 + Math.random() * 10 });
+    p.position.set((Math.random() - 0.5) * 20, 0, -220 - Math.random() * 350);
+    policeCars.push({ group: p, speed: 32 + Math.random() * 12 });
   }
-  for (let i = 0; i < 4; i++) createPolice();
+  for (let i = 0; i < 5; i++) createPolice();
 
   // ================= STATE =================
   let velocity = 0;
@@ -284,78 +387,80 @@
     requestAnimationFrame(animate);
     const dt = Math.min(clock.getDelta(), 0.05);
 
-    // Acceleration
+    // Acceleration (very high for 1000 km/h)
     let accel = 0;
-    if (keys["w"] || keys["arrowup"]) accel = 42;
-    if (keys["s"] || keys["arrowdown"]) accel = -25;
-    if (keys[" "]) velocity *= 0.94; // handbrake
+    if (keys["w"] || keys["arrowup"]) accel = 95;
+    if (keys["s"] || keys["arrowdown"]) accel = -35;
+    if (keys[" "]) velocity *= 0.93;
 
     // Nitro
     if ((keys["shift"] || keys["shiftleft"]) && nitro > 0 && accel > 0) {
-      accel *= 1.9;
-      nitro = Math.max(0, nitro - dt * 28);
+      accel *= 2.5;
+      nitro = Math.max(0, nitro - dt * 30);
     } else {
-      nitro = Math.min(100, nitro + dt * 6);
+      nitro = Math.min(100, nitro + dt * 7);
     }
 
-    velocity += (accel - velocity * 1.6) * dt;
-    velocity = Math.max(-20, Math.min(68, velocity));
+    velocity += (accel - velocity * 1.35) * dt;
+    velocity = Math.max(-35, Math.min(280, velocity)); // ~1000 km/h
 
     // Steering
     let steerInput = 0;
-    if (keys["a"] || keys["arrowleft"]) steerInput = 1.2;
-    if (keys["d"] || keys["arrowright"]) steerInput = -1.2;
-    steer += (steerInput - steer) * dt * 7;
-    yaw += steer * (velocity * 0.035) * dt;
+    if (keys["a"] || keys["arrowleft"]) steerInput = 1.15;
+    if (keys["d"] || keys["arrowright"]) steerInput = -1.15;
+    steer += (steerInput - steer) * dt * 8;
+    yaw += steer * (velocity * 0.028) * dt;
 
     // Move car
     car.position.x += Math.sin(yaw) * velocity * dt;
     car.position.z += Math.cos(yaw) * velocity * dt;
     car.rotation.y = yaw;
-
-    // Keep on road roughly
-    car.position.x = Math.max(-18, Math.min(18, car.position.x));
+    car.position.x = Math.max(-19, Math.min(19, car.position.x));
 
     // Wheel spin
-    wheels.forEach(w => w.rotation.x -= velocity * dt * 1.8);
+    wheels.forEach(w => w.rotation.x -= velocity * dt * 1.9);
 
-    // Camera (chase)
-    const camOffset = new THREE.Vector3(
-      Math.sin(yaw) * 11,
-      5.5,
-      -Math.cos(yaw) * 11
+    // Steering wheel turns
+    steeringGroup.rotation.z = steer * 0.75;
+
+    // ========== FIRST PERSON CAMERA ==========
+    const fpOffset = new THREE.Vector3(-0.52, 1.72, 0.18);
+    const worldOffset = fpOffset.clone().applyAxisAngle(new THREE.Vector3(0, 1, 0), yaw);
+    camera.position.copy(car.position).add(worldOffset);
+
+    const lookTarget = new THREE.Vector3(
+      car.position.x + Math.sin(yaw) * 14,
+      1.55,
+      car.position.z + Math.cos(yaw) * 14
     );
-    camera.position.lerp(car.position.clone().add(camOffset), 1 - Math.pow(0.001, dt));
-    camera.lookAt(car.position.x, 1.5, car.position.z);
+    camera.lookAt(lookTarget);
 
-    // Police chase
+    // Police
     policeCars.forEach(p => {
       const dx = car.position.x - p.group.position.x;
       const dz = car.position.z - p.group.position.z;
       const dist = Math.hypot(dx, dz);
 
-      if (dist < 120) {
+      if (dist < 140) {
         const angle = Math.atan2(dx, dz);
         p.group.rotation.y = angle;
         p.group.position.x += Math.sin(angle) * p.speed * dt;
         p.group.position.z += Math.cos(angle) * p.speed * dt;
 
-        if (dist < 9 && wanted < 5) {
+        if (dist < 10 && wanted < 5) {
           wanted = Math.min(5, wanted + 1);
           showMessage("POLICE SPOTTED YOU!");
         }
       } else {
-        // Reset far police
-        if (p.group.position.z > car.position.z + 150) {
-          p.group.position.z = car.position.z - 250 - Math.random() * 100;
-          p.group.position.x = (Math.random() - 0.5) * 30;
+        if (p.group.position.z > car.position.z + 180) {
+          p.group.position.z = car.position.z - 280 - Math.random() * 120;
+          p.group.position.x = (Math.random() - 0.5) * 28;
         }
       }
     });
 
-    // Neon light follows car a bit
     neon.position.x = car.position.x;
-    neon.position.z = car.position.z + 10;
+    neon.position.z = car.position.z + 12;
 
     updateHUD();
     renderer.render(scene, camera);
