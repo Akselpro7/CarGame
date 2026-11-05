@@ -1,69 +1,29 @@
-function createCar(group, color = 0x168bd4) {
-  const paint = mat(color, 0.75, 0.23);
-  const glass = mat(0x142c3c, 0.45, 0.18);
-  const interior = mat(0x1a1a1a);
-  const seat = mat(0x222222);
-  const dash = mat(0x111111);
+function updateDriving(dt) {
+  let accel = 0;
+  if (keys["w"] || keys["arrowup"]) accel = 28;
+  if (keys["s"] || keys["arrowdown"]) accel = -18;
+  if (keys[" "]) velocity *= 0.92;
 
-  // Main body
-  box(group, 0, 0.85, 0, 3.1, 0.85, 6, paint);
-  // Roof / cabin glass
-  box(group, 0, 1.48, -0.3, 2.5, 0.9, 2.8, glass);
-  // Hood
-  box(group, 0, 1.45, 2.15, 2.4, 0.55, 1.3, paint);
-  // Trunk
-  box(group, 0, 1.35, -2.8, 2.8, 0.35, 0.5, paint);
-
-  // Lights
-  for (const x of [-1, 1]) {
-    box(group, x * 1.1, 1, 3.02, 0.55, 0.25, 0.06, whiteMat);
-    box(group, x * 1.1, 0.85, -3.02, 0.5, 0.22, 0.06, redMat);
+  if ((keys["shift"] || keys["shiftleft"]) && nitro > 0 && accel > 0) {
+    accel *= 1.8;
+    nitro = Math.max(0, nitro - dt * 25);
+  } else {
+    nitro = Math.min(100, nitro + dt * 8);
   }
 
-  // Spoiler
-  box(group, 0, 1.9, -2.75, 2.4, 0.12, 0.45, blackMat);
+  velocity += (accel - velocity * 1.8) * dt;
+  velocity = Math.max(-25, Math.min(55, velocity));
 
-  // Wheels
-  for (const x of [-1.55, 1.55]) {
-    for (const z of [-2, 2]) {
-      const wheel = new THREE.Mesh(new THREE.CylinderGeometry(0.48, 0.48, 0.35, 16), tireMat);
-      wheel.rotation.z = Math.PI / 2;
-      wheel.position.set(x, 0.48, z);
-      group.add(wheel);
+  let steerInput = 0;
+  if (keys["a"] || keys["arrowleft"]) steerInput = 1;
+  if (keys["d"] || keys["arrowright"]) steerInput = -1;
 
-      const hub = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, 0.37, 12), metalMat);
-      hub.rotation.z = Math.PI / 2;
-      hub.position.set(x, 0.48, z);
-      group.add(hub);
-    }
-  }
+  steer += (steerInput - steer) * dt * 6;
+  yaw += steer * velocity * dt * 0.04;
 
-  // ===== REALISTIC INTERIOR =====
-  // Floor
-  box(group, 0, 0.95, -0.2, 2.4, 0.08, 3.6, interior);
-
-  // Dashboard
-  box(group, 0, 1.35, 1.35, 2.3, 0.35, 0.7, dash);
-  // Steering wheel
-  const steering = new THREE.Mesh(new THREE.TorusGeometry(0.28, 0.045, 8, 20), blackMat);
-  steering.position.set(-0.55, 1.55, 1.15);
-  steering.rotation.x = -0.3;
-  group.add(steering);
-
-  // Seats
-  // Driver seat
-  box(group, -0.6, 1.15, -0.4, 0.7, 0.55, 0.9, seat);
-  box(group, -0.6, 1.45, -0.75, 0.7, 0.7, 0.15, seat); // backrest
-  // Passenger seat
-  box(group, 0.6, 1.15, -0.4, 0.7, 0.55, 0.9, seat);
-  box(group, 0.6, 1.45, -0.75, 0.7, 0.7, 0.15, seat);
-
-  // Center console
-  box(group, 0, 1.15, 0.3, 0.35, 0.4, 1.8, dash);
-
-  // Driver figure (simple)
-  box(group, -0.6, 1.55, -0.3, 0.4, 0.5, 0.35, mat(0x1a2a40));
-  const head = new THREE.Mesh(new THREE.SphereGeometry(0.18, 12, 10), mat(0xd3a17d));
-  head.position.set(-0.6, 1.95, -0.25);
-  group.add(head);
+  // Corrected movement direction
+  car.position.x += Math.sin(yaw) * velocity * dt;
+  car.position.z += Math.cos(yaw) * velocity * dt;
+  car.rotation.y = yaw;
+  car.position.y = 0;
 }
