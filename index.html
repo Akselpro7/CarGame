@@ -1,29 +1,375 @@
-function updateDriving(dt) {
-  let accel = 0;
-  if (keys["w"] || keys["arrowup"]) accel = 28;
-  if (keys["s"] || keys["arrowdown"]) accel = -18;
-  if (keys[" "]) velocity *= 0.92;
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NIGHT HEAT - Street Racing</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { overflow: hidden; background: #000; font-family: Arial, sans-serif; color: white; }
+  canvas { display: block; }
 
-  if ((keys["shift"] || keys["shiftleft"]) && nitro > 0 && accel > 0) {
-    accel *= 1.8;
-    nitro = Math.max(0, nitro - dt * 25);
-  } else {
-    nitro = Math.min(100, nitro + dt * 8);
+  #hud {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 10;
   }
 
-  velocity += (accel - velocity * 1.8) * dt;
-  velocity = Math.max(-25, Math.min(55, velocity));
+  #title {
+    position: absolute;
+    top: 20px;
+    left: 25px;
+    font-size: 28px;
+    font-weight: 900;
+    letter-spacing: 3px;
+    color: #ff2a6d;
+    text-shadow: 0 0 15px #ff2a6d;
+  }
 
-  let steerInput = 0;
-  if (keys["a"] || keys["arrowleft"]) steerInput = 1;
-  if (keys["d"] || keys["arrowright"]) steerInput = -1;
+  #speed {
+    position: absolute;
+    bottom: 40px;
+    right: 40px;
+    font-size: 72px;
+    font-weight: 900;
+    text-align: right;
+    line-height: 1;
+  }
+  #speed span {
+    font-size: 22px;
+    opacity: 0.7;
+  }
 
-  steer += (steerInput - steer) * dt * 6;
-  yaw += steer * velocity * dt * 0.04;
+  #nitro-bar {
+    position: absolute;
+    bottom: 40px;
+    left: 40px;
+    width: 220px;
+  }
+  #nitro-bar .label {
+    font-size: 14px;
+    margin-bottom: 6px;
+    color: #00f0ff;
+  }
+  #nitro-bar .bar {
+    height: 14px;
+    background: #222;
+    border-radius: 10px;
+    overflow: hidden;
+    border: 1px solid #00f0ff;
+  }
+  #nitro-bar .fill {
+    height: 100%;
+    width: 100%;
+    background: linear-gradient(90deg, #00f0ff, #0088ff);
+    transition: width 0.1s;
+  }
 
-  // Corrected movement direction
-  car.position.x += Math.sin(yaw) * velocity * dt;
-  car.position.z += Math.cos(yaw) * velocity * dt;
-  car.rotation.y = yaw;
-  car.position.y = 0;
-}
+  #wanted {
+    position: absolute;
+    top: 25px;
+    right: 40px;
+    font-size: 28px;
+    color: #ffcc00;
+    letter-spacing: 6px;
+  }
+
+  #message {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 32px;
+    font-weight: bold;
+    text-shadow: 0 0 20px black;
+    display: none;
+    text-align: center;
+  }
+
+  #help {
+    position: absolute;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 13px;
+    opacity: 0.6;
+    text-align: center;
+  }
+</style>
+</head>
+<body>
+
+<div id="hud">
+  <div id="title">NIGHT HEAT</div>
+  <div id="wanted">☆☆☆☆☆</div>
+  <div id="speed">0<span> KM/H</span></div>
+
+  <div id="nitro-bar">
+    <div class="label">NITRO</div>
+    <div class="bar"><div class="fill" id="nitroFill"></div></div>
+  </div>
+
+  <div id="message"></div>
+  <div id="help">
+    W / ↑ Accelerate &nbsp;·&nbsp; S / ↓ Brake &nbsp;·&nbsp; A / D Steer &nbsp;·&nbsp; SHIFT Nitro<br>
+    Space = Handbrake
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+(() => {
+  "use strict";
+
+  // ================= SETUP =================
+  const scene = new THREE.Scene();
+  scene.background = new THREE.Color(0x050510);
+  scene.fog = new THREE.Fog(0x050510, 80, 350);
+
+  const camera = new THREE.PerspectiveCamera(75, innerWidth / innerHeight, 0.1, 1000);
+  const renderer = new THREE.WebGLRenderer({ antialias: true });
+  renderer.setSize(innerWidth, innerHeight);
+  renderer.setPixelRatio(Math.min(devicePixelRatio, 1.5));
+  document.body.appendChild(renderer.domElement);
+
+  // Lights
+  scene.add(new THREE.AmbientLight(0x222244, 1.5));
+  const sun = new THREE.DirectionalLight(0x6688ff, 1.2);
+  sun.position.set(50, 100, 30);
+  scene.add(sun);
+
+  // Neon street lights effect
+  const neon = new THREE.PointLight(0xff2a6d, 2, 80);
+  neon.position.set(0, 8, 0);
+  scene.add(neon);
+
+  // ================= GROUND & ROAD =================
+  const roadMat = new THREE.MeshStandardMaterial({ color: 0x111118, roughness: 0.1, roughness: 0.9 });
+  const road = new THREE.Mesh(new THREE.PlaneGeometry(40, 2000), roadMat);
+  road.rotation.x = -Math.PI / 2;
+  scene.add(road);
+
+  // Road lines
+  const lineMat = new THREE.MeshBasicMaterial({ color: 0xffcc00 });
+  for (let z = -900; z < 900; z += 25) {
+    const line = new THREE.Mesh(new THREE.PlaneGeometry(0.4, 8), lineMat);
+    line.rotation.x = -Math.PI / 2;
+    line.position.set(0, 0.02, z);
+    scene.add(line);
+  }
+
+  // Sidewalks / barriers
+  const barrierMat = new THREE.MeshStandardMaterial({ color: 0x222230 });
+  for (let side of [-1, 1]) {
+    const barrier = new THREE.Mesh(new THREE.BoxGeometry(3, 1.2, 2000), barrierMat);
+    barrier.position.set(side * 22, 0.6, 0);
+    scene.add(barrier);
+  }
+
+  // Buildings on the sides
+  function makeBuilding(x, z) {
+    const h = 15 + Math.random() * 40;
+    const mat = new THREE.MeshStandardMaterial({
+      color: new THREE.Color().setHSL(0.6 + Math.random() * 0.1, 0.3, 0.15 + Math.random() * 0.1)
+    });
+    const b = new THREE.Mesh(new THREE.BoxGeometry(18 + Math.random() * 10, h, 18 + Math.random() * 10), mat);
+    b.position.set(x, h / 2, z);
+    scene.add(b);
+
+    // Windows
+    const winMat = new THREE.MeshBasicMaterial({ color: 0x88ccff, transparent: true, opacity: 0.7 });
+    for (let y = 4; y < h - 3; y += 5) {
+      for (let wx = -6; wx <= 6; wx += 4) {
+        const win = new THREE.Mesh(new THREE.PlaneGeometry(2, 2.5), winMat);
+        win.position.set(x + wx, y, z + (x > 0 ? -9.1 : 9.1));
+        win.rotation.y = x > 0 ? Math.PI : 0;
+        scene.add(win);
+      }
+    }
+  }
+
+  for (let z = -800; z < 800; z += 45) {
+    makeBuilding(-35 - Math.random() * 15, z + Math.random() * 20);
+    makeBuilding(35 + Math.random() * 15, z + Math.random() * 20);
+  }
+
+  // ================= CAR =================
+  const car = new THREE.Group();
+  const bodyMat = new THREE.MeshStandardMaterial({ color: 0xff2a6d, metalness: 0.7, roughness: 0.25 });
+  const darkMat = new THREE.MeshStandardMaterial({ color: 0x111111 });
+  const glassMat = new THREE.MeshStandardMaterial({ color: 0x88aacc, metalness: 0.9, roughness: 0.1, transparent: true, opacity: 0.7 });
+
+  // Body
+  const body = new THREE.Mesh(new THREE.BoxGeometry(2.2, 0.7, 5), bodyMat);
+  body.position.y = 0.7;
+  car.add(body);
+
+  // Cabin
+  const cabin = new THREE.Mesh(new THREE.BoxGeometry(1.9, 0.6, 2.4), glassMat);
+  cabin.position.set(0, 1.25, -0.3);
+  car.add(cabin);
+
+  // Wheels
+  const wheelGeo = new THREE.CylinderGeometry(0.4, 0.4, 0.35, 16);
+  const wheelMat = new THREE.MeshStandardMaterial({ color: 0x111111 });
+  const wheels = [];
+  [[-1.1, 1.5], [1.1, 1.5], [-1.1, -1.6], [1.1, -1.6]].forEach(([x, z]) => {
+    const w = new THREE.Mesh(wheelGeo, wheelMat);
+    w.rotation.z = Math.PI / 2;
+    w.position.set(x, 0.4, z);
+    car.add(w);
+    wheels.push(w);
+  });
+
+  scene.add(car);
+  car.position.set(0, 0, 0);
+
+  // ================= POLICE =================
+  const policeCars = [];
+  function createPolice() {
+    const p = new THREE.Group();
+    const pBody = new THREE.Mesh(new THREE.BoxGeometry(2.2, 0.7, 5), new THREE.MeshStandardMaterial({ color: 0x111133 }));
+    pBody.position.y = 0.7;
+    p.add(pBody);
+
+    // Lights
+    const red = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.2, 0.4), new THREE.MeshBasicMaterial({ color: 0xff0000 }));
+    red.position.set(-0.5, 1.4, 0);
+    p.add(red);
+    const blue = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.2, 0.4), new THREE.MeshBasicMaterial({ color: 0x0066ff }));
+    blue.position.set(0.5, 1.4, 0);
+    p.add(blue);
+
+    scene.add(p);
+    p.position.set((Math.random() - 0.5) * 20, 0, -200 - Math.random() * 300);
+    policeCars.push({ group: p, speed: 28 + Math.random() * 10 });
+  }
+  for (let i = 0; i < 4; i++) createPolice();
+
+  // ================= STATE =================
+  let velocity = 0;
+  let yaw = 0;
+  let steer = 0;
+  let nitro = 100;
+  let wanted = 0;
+  let keys = {};
+
+  // ================= CONTROLS =================
+  addEventListener("keydown", e => {
+    keys[e.key.toLowerCase()] = true;
+    if (["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", " "].includes(e.key)) e.preventDefault();
+  });
+  addEventListener("keyup", e => keys[e.key.toLowerCase()] = false);
+
+  // ================= UI =================
+  function showMessage(text) {
+    const el = document.getElementById("message");
+    el.textContent = text;
+    el.style.display = "block";
+    clearTimeout(showMessage.t);
+    showMessage.t = setTimeout(() => el.style.display = "none", 2200);
+  }
+
+  function updateHUD() {
+    document.getElementById("speed").innerHTML = Math.round(Math.abs(velocity) * 3.6) + "<span> KM/H</span>";
+    document.getElementById("nitroFill").style.width = nitro + "%";
+    document.getElementById("wanted").textContent = "★".repeat(wanted) + "☆".repeat(5 - wanted);
+  }
+
+  // ================= MAIN LOOP =================
+  const clock = new THREE.Clock();
+
+  function animate() {
+    requestAnimationFrame(animate);
+    const dt = Math.min(clock.getDelta(), 0.05);
+
+    // Acceleration
+    let accel = 0;
+    if (keys["w"] || keys["arrowup"]) accel = 42;
+    if (keys["s"] || keys["arrowdown"]) accel = -25;
+    if (keys[" "]) velocity *= 0.94; // handbrake
+
+    // Nitro
+    if ((keys["shift"] || keys["shiftleft"]) && nitro > 0 && accel > 0) {
+      accel *= 1.9;
+      nitro = Math.max(0, nitro - dt * 28);
+    } else {
+      nitro = Math.min(100, nitro + dt * 6);
+    }
+
+    velocity += (accel - velocity * 1.6) * dt;
+    velocity = Math.max(-20, Math.min(68, velocity));
+
+    // Steering
+    let steerInput = 0;
+    if (keys["a"] || keys["arrowleft"]) steerInput = 1.2;
+    if (keys["d"] || keys["arrowright"]) steerInput = -1.2;
+    steer += (steerInput - steer) * dt * 7;
+    yaw += steer * (velocity * 0.035) * dt;
+
+    // Move car
+    car.position.x += Math.sin(yaw) * velocity * dt;
+    car.position.z += Math.cos(yaw) * velocity * dt;
+    car.rotation.y = yaw;
+
+    // Keep on road roughly
+    car.position.x = Math.max(-18, Math.min(18, car.position.x));
+
+    // Wheel spin
+    wheels.forEach(w => w.rotation.x -= velocity * dt * 1.8);
+
+    // Camera (chase)
+    const camOffset = new THREE.Vector3(
+      Math.sin(yaw) * 11,
+      5.5,
+      -Math.cos(yaw) * 11
+    );
+    camera.position.lerp(car.position.clone().add(camOffset), 1 - Math.pow(0.001, dt));
+    camera.lookAt(car.position.x, 1.5, car.position.z);
+
+    // Police chase
+    policeCars.forEach(p => {
+      const dx = car.position.x - p.group.position.x;
+      const dz = car.position.z - p.group.position.z;
+      const dist = Math.hypot(dx, dz);
+
+      if (dist < 120) {
+        const angle = Math.atan2(dx, dz);
+        p.group.rotation.y = angle;
+        p.group.position.x += Math.sin(angle) * p.speed * dt;
+        p.group.position.z += Math.cos(angle) * p.speed * dt;
+
+        if (dist < 9 && wanted < 5) {
+          wanted = Math.min(5, wanted + 1);
+          showMessage("POLICE SPOTTED YOU!");
+        }
+      } else {
+        // Reset far police
+        if (p.group.position.z > car.position.z + 150) {
+          p.group.position.z = car.position.z - 250 - Math.random() * 100;
+          p.group.position.x = (Math.random() - 0.5) * 30;
+        }
+      }
+    });
+
+    // Neon light follows car a bit
+    neon.position.x = car.position.x;
+    neon.position.z = car.position.z + 10;
+
+    updateHUD();
+    renderer.render(scene, camera);
+  }
+
+  animate();
+  showMessage("NIGHT HEAT — GO!");
+
+  addEventListener("resize", () => {
+    camera.aspect = innerWidth / innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(innerWidth, innerHeight);
+  });
+})();
+</script>
+</body>
+</html>
